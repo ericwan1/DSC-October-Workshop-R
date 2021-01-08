@@ -1,0 +1,338 @@
+---
+output:
+  html_document: default
+  pdf_document: default
+---
+# Welcome to my Workshop! 
+
+This markdown file should contain lots of helpful information. Feel free to save it and refer to it in the future for any work that you may have to do! ~ ericwan
+
+## Loading... the Data
+
+Here we load libraries and install packages. This can be accomplished using `install.packages()` and `library()`. 
+
+```{r}
+# install.packages("tidyverse")
+# Run the above command if you have not already installed the tidyverse package!
+# If this is your first time using RStudio/R then you most likely have not yet installed this package. 
+
+library(tidyverse)
+# This library contains the library(ggplot2). Tidyverse is super useful. 
+```
+
+## Preliminary EDA 
+
+We begin by loading the data! We use the method `read.csv()` from tidyverse. Note the parameters we are passing into it. 
+
+```{r}
+data = read.csv('train.csv', header = TRUE, na.strings = c("","NA"))
+head(data)
+```
+
+Now that we have gotten a quick peek at our data, let's look at some other aspects. Note that there are 891 rows and 12 columns. 
+
+```{r}
+dim(data)
+```
+
+The `names()` function helps us grab the column names, in order. 
+
+```{r}
+names(data)
+```
+
+What do all of these names mean? Looking at our source for the dataset, we find the following descriptions for some of the less obvious names: 
+
+(https://www.kaggle.com/c/titanic/data)
+
+sibsp : # of siblings / spouses aboard the Titanic (mistresses and fiancés were ignored)
+
+parch : # of parents / children aboard the Titanic (parch = 0 for children travelling with only a nanny)
+
+embarked : Port of Embarkation, where C = Cherbourg, Q = Queenstown, S = Southampton
+
+Sometimes, we may work with datasets that are incomplete and are missing values. Luckily, there are several ways we can figure out if this is the case. Note from the output that we are missing information in the 'Age', 'Cabin', and 'Embarked' columns, and that we can even find out how many values are missing. We can also verify that other information is not incorrect. 
+
+Making sure there is no duplicated passenger ID. 
+
+```{r}
+sum(duplicated(data$PassengerId)) == 0
+sum(data$PassengerId == 1:891) == 891
+```
+
+Checking if there any missing values. 
+
+```{r}
+sum(is.na(data$PassengerId))
+sum(is.na(data$Survived))
+sum(is.na(data$Pclass))
+
+sum(is.na(data$Age)) 
+any(is.na(data$Age))
+
+colnames(data)[apply(data, 2, anyNA)]
+```
+
+A good idea to begin with is to always to explore the distributions of our features. Below I have graphed the distributions of several variables. 
+
+```{r}
+# install.packages("gridExtra")
+library(gridExtra)
+
+plotSurvive <- ggplot(data) + 
+  geom_bar(aes(x = Survived))
+
+plotClass <- ggplot(data) + 
+  geom_bar(aes(x = Pclass))
+
+plotSex <- ggplot(data) + 
+  geom_bar(aes(x = Sex))
+
+plotAge <- ggplot(data) + 
+  geom_histogram(aes(x = Age))
+
+plotSibSp <- ggplot(data) + 
+  geom_bar(aes(x = SibSp))
+
+plotParch <- ggplot(data) + 
+  geom_bar(aes(x = Parch))
+
+plotFare <- ggplot(data) + 
+  geom_histogram(aes(x = Fare))
+
+plotEmbark <- ggplot(data) + 
+  geom_bar(aes(x = Embarked))
+
+grid.arrange(plotSurvive, plotClass, plotSex, plotAge, plotSibSp, plotParch, plotFare, plotEmbark, ncol = 4)
+```
+
+What conclusions can we draw from the code below, including the information we already know and have seen? 
+
+```{r}
+length(unique(data$Name))
+length(unique(data$Ticket))
+length(unique(data$Cabin))
+```
+
+## Some Feature Engineering
+
+A tiny bit of feature engineering first. Feature engineering can be defined as the process of extracting features from raw data using data mining techniques to provide new insights for machine learning. 
+
+That's a lot of fancy words. 
+
+With regards to our data, note that `Pclass` and `Survived` are stored as numbers, and we're gonna change that so they are instead categorical values. We're going to quickly create "factor" variables from them. This will help with our analysis.
+
+```{r}
+library(dplyr)
+titanic <- mutate(data, 
+                  passengerClass = fct_recode(as.factor(Pclass),
+                                              "1st" = "1", "2nd" = "2", "3rd" = "3"),
+                  Survival = fct_recode(as.factor(Survived), 
+                                        "died" = "0", "lived" = "1"))
+```
+
+Where did the extra two columns come from? If you guessed that they were created after our call to `mutate()`, you are correct! Also we grab our new column names and we see that the changes we made have held.  
+
+```{r}
+dim(titanic)
+```
+
+```{r}
+names(titanic)
+```
+
+Just a quick look at our new changes. 
+
+```{r}
+head(titanic)
+```
+
+Let's now try something called boolean indexing to help us filter our data into two groups that we can use to gain more insights. Don't you like how convenient and logical R is? 
+
+```{r}
+train_titanic_survived <- titanic[titanic$Survival == "lived", ]
+train_titanic_perished <- titanic[titanic$Survival == "died", ]
+
+head(train_titanic_survived)
+head(train_titanic_perished)
+```
+
+## Introduction to ggplot
+
+Using this sorted training data, let us now utilize plots to better understand the distribution of the data! We want to use the ggplot2 library because it is very flexible and has many useful methods. Also, it makes pretty graphs. Here we load the library, using `library()`. Note that ggplot2 is already included when we ran `load(tidyverse)` in the beginning of the file. That being said, we may not always want to import everything. 
+
+```{r}
+library(ggplot2)
+```
+
+Let's begin our more in-depth analysis of the Titanic dataset by examining how many people either survived or perished. We know that within our training dataset we have a total of 891 rows. We can reasonably infer that we are going to be training on a total of 891 people. 
+
+Take note of the specific calls I made within the code. In particular, what is the relevance of `aes()`, `geom_bar()` and `labs()`? 
+
+```{r}
+ggplot(titanic, aes(x = titanic$Survival)) + 
+  geom_bar() + 
+  labs(title = "Number of Survivors and Victims",
+       x = "",
+       y = "Count",
+       caption = "This is a caption!")
+```
+
+## Looking at Sex
+
+An iconic phrase from the Titanic disaster is "women and children first!". We will first investigate if this is true by examining the data. From our first plot below, we see that were more males than females onboard. 
+
+```{r}
+ggplot(titanic, aes(x = Sex, fill = Sex)) + 
+  geom_bar(aes(x = Sex, fill = Sex))
+```
+
+More females survived the Titanic disaster than males. 
+
+```{r}
+ggplot(train_titanic_survived) + 
+  geom_bar(aes(x = train_titanic_survived$Sex, fill = train_titanic_survived$Sex)) + 
+  labs(x = "Sex",
+       y = "Count",
+       title = "Survivorship by Sex",
+       fill = "Sex")
+```
+
+More males died than females in the Titanic disaster. 
+
+```{r}
+ggplot(train_titanic_perished) + 
+  geom_bar(aes(x = train_titanic_perished$Sex, fill = train_titanic_perished$Sex)) + 
+  labs(x = "Sex",
+       y = "Count",
+       title = "Deaths sorted by Sex",
+       fill = "Sex")
+```
+
+We thus see that it would probably be a great idea to use Sex in a model to help us predict if a passenger is going to or will not survive the titanic disaster. There are also other ways in which we can reach this conclusion, as shown below. We can use a contingency table. 
+
+In the code below the symbol `%>%` can be read as “pipe”. The pipe operator inserts the object before the pipe into the function after the pipe. Here we’re piping the output of `count()` into `spread()`. Piping objects is super useful. Also, make sure to run `library(dplyr)` and install the dplyr package.
+
+```{r}
+# install.packages("dplyr")
+# library(dplyr)
+
+count(titanic, Sex, Survival) %>% 
+  spread(Survival, n)
+```
+
+Fun thing, we can also build bar charts using proportions rather than counts. Which can be really helpful! Note the use of `position = "fill"`.
+
+```{r}
+ggplot(titanic) +
+  geom_bar(aes(Sex, fill = Survival), position = "fill") + 
+  labs(title = "Look at this Graph!",
+       x = "Sex",
+       y = "Proportion")
+
+```
+
+## Okay, but what about class? 
+
+The class on a passenger’s ticket is a useful proxy for their societal status. That makes it an interesting variable to consider, along with Sex. 
+
+Here is a bar plot that takes into account all three of these variables, by representing passenger class as a “facet” variable – we create different subplots for each class grouping. Also note `position = "fill"` also allows us to create and compare using proportions. 
+
+As we can observe from the plot, first class ticket holders survied the disaster at higher rates than their fellow passengers onboard the HMS Titanic. 
+
+```{r}
+ggplot(data = titanic) +
+   geom_bar(aes(x = passengerClass, fill = Survival), position = "fill") + 
+   labs(x = "Passenger Class",
+        y = "Proportion of Lived and Died", 
+        title = "Survival by Class")
+```
+
+What about how class intersects with sex in the Titanic disaster? It appears that regardless of class, females survived at higher rates than men, and that the first class ticket holders survied the disaster at higher rates than their fellow passengers onboard the HMS Titanic. 
+
+```{r}
+ggplot(titanic) +
+   geom_bar(aes(Sex, fill = Survival), position = "fill") + 
+   facet_wrap(~passengerClass) + 
+   labs(y = "Proportion of Lived and Died", 
+        title = "Survival by Sex and Class")
+```
+
+## Did Boomers die at a higher rate during the disaster? 
+
+It might also be interesting to evaluate how age is related to the survival rates. Were older people sacrificing themselves to let the young live? Did babies just get tossed overboard? Let's find out! 
+
+Let's first use a histogram to visualize the distribution of a continuous variable. We filter out the 'NA' in the data using pipes and `filter()`. 
+
+```{r}
+titanic %>%
+  filter(!is.na(Age)) %>%
+  ggplot(data = ., aes(x = Age)) +
+  geom_histogram(bins = 25) + 
+  labs(x = "Age",
+       y = "Count",
+       title = "Distribution of Age")
+```
+
+We can use boxplots to evaluate the spread of the `Age` variable. Judging from our plot, it does not appear that `Age` makes a significant difference between those who live and die. 
+
+```{r}
+titanic %>%
+  filter(!is.na(Age)) %>%
+  ggplot() + 
+  geom_boxplot(aes(x = Survival, y = Age, fill = Survival))
+```
+
+We can also represent the information from the boxplot in a more visually appealing manner. Namely, we can use a violin plot. We can overlay a boxplot on top to get a "best of both worlds" type of approach. We can see a slight bulge at the bottom for the plot representing those who lived, but, this is relatively insignificant in comparison to other variables. 
+
+Again, we can set custom colors, transpaarency, and more with ggplot. More on the color palette of the graph later. 
+
+```{r}
+cbPalette = c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+
+titanic %>%
+  filter(!is.na(Age)) %>%
+  ggplot(aes(x = Survival, y = Age, fill = Survival)) + 
+  geom_violin(alpha = 0.4) +
+  geom_boxplot(color = "violet", fill = "blue", alpha = 0.5, width = 0.1) + 
+  scale_fill_manual(values = cbPalette)
+```
+
+## Some Conclusions
+
+From our basic analysis of the data, it appears that the most important factors are probably Sex and Passenger Class. We did not look into the passenger names, fare and cabin because we assumed that they were linked with the passenger sex and class. That being said, some ideas for the future could include using feature engineering to aggregate, say, the passenger cabins into distinct groups and we could then perform analysis on that new feature. We could perhaps do the same with passenger names. 
+
+### Some side notes: 
+
+Probably want to use a different color palette than the default provided by ggplot. Different palettes can be found online, here's a link: https://stackoverflow.com/questions/57153428/r-plot-color-combinations-that-are-colorblind-accessible 
+
+This is a color blind palette! 
+
+```{r}
+cbPalette <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+```
+
+When Comparing... 
+
+numerical v.s. numerical
+
+- scatterplots
+
+categorical v.s. categorical
+
+- contingency tables
+
+- bar plots, mosaic plots
+
+categorical v.s. numerical
+
+- side-by-side boxplots
+
+
+
+
+
+
+
+
+
